@@ -1,3 +1,5 @@
+package com.daquinoaldo.javautils;
+
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.InputStreamReader;
