@@ -1,4 +1,4 @@
-package com.aldodaquino.javautils;
+package com.daquinoaldo.javautils;
 
 public class Pair <T, U> {
 
