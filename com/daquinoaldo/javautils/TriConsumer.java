@@ -1,4 +1,4 @@
-package com.aldodaquino.javautils;
+package com.daquinoaldo.javautils;
 
 import java.util.Objects;
 import java.util.function.BiConsumer;
@@ -23,4 +23,3 @@ public interface TriConsumer<T, U, V> {
         };
     }
 }
-
