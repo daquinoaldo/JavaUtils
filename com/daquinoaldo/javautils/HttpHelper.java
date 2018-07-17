@@ -1,4 +1,4 @@
-package com.aldodaquino.javautils;
+package com.daquinoaldo.javautils;
 
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpHandler;
