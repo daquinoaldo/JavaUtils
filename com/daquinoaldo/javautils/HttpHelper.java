@@ -1,53 +1,42 @@
-package com.daquinoaldo.javautils;
+package com.aldodaquino.javautils;
 
 import com.sun.net.httpserver.HttpExchange;
-import com.sun.net.httpserver.HttpHandler;
 
 import java.io.*;
-import java.net.*;
+import java.net.HttpURLConnection;
+import java.net.URL;
+import java.net.URLDecoder;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
-import java.util.function.Consumer;
 
+/**
+ * Contains method that help to make http request.
+ * Works with JSON body for POST request and query-style GET parameters.
+ * @author Aldo D'Aquino.
+ * @version 1.1.
+ */
 public class HttpHelper {
 
-    private static CookieManager cookieManager = new CookieManager();
+    /* SERVER SIDE */
 
-    private static class HttpRequestHandler implements HttpHandler {
-        Consumer<HttpExchange> consumer;
-        HttpRequestHandler(Consumer<HttpExchange> consumer) {
-            this.consumer = consumer;
-        }
-        @Override
-        public void handle(HttpExchange request) {
-            consumer.accept(request);
-        }
-    }
-
-    public static HttpHandler newHandler(Consumer<HttpExchange> consumer) {
-        return new HttpRequestHandler(consumer);
-    }
-
+    /**
+     * Parse a GET request and return a Map with keys equals to parameters name and values equals to the parameters
+     * values.
+     * @param request the HttpExchange request received by the handler.
+     * @return Map where both keys and values are strings containing the parameters.
+     */
     public static Map<String, String> parseGET(HttpExchange request) {
         String query = request.getRequestURI().getRawQuery();
-        return parseQuery(query);
-    }
-
-    public static Map<String, String> parsePOST(HttpExchange request) {
-        String query = null;
-        try {
-            InputStreamReader isr = new InputStreamReader(request.getRequestBody(), "utf-8");
-            query = new BufferedReader(isr).readLine();
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-        return parseQuery(query);
-    }
-
-    private static Map<String, String> parseQuery(String query) {
         if (query == null || query.length() == 0) throw new IllegalArgumentException("Invalid query: null.");
+        return parseQuery(query);
+    }
 
+    /**
+     * Parse a query and return a Map with keys equals to parameters name and values equals to the parameters values.
+     * @param query the String representing the query.
+     * @return Map where both keys and values are strings containing the parameters.
+     */
+    public static Map<String, String> parseQuery(String query) {
         // HashMap to be filled with all parameters in the query
         Map<String, String> parameters = new HashMap<>();
 
@@ -67,10 +56,62 @@ public class HttpHelper {
                 }
             }
         }
-
         return parameters;
     }
 
+    /**
+     * Parse a POST request and return a Map with keys equals to parameters name and values equals to the parameters
+     * values.
+     * @param request the HttpExchange request received by the handler.
+     * @return Map where both keys and values are strings containing the parameters.
+     */
+    public static Map<String, String> parsePOST(HttpExchange request) {
+        String json = null;
+        try {
+            InputStreamReader isr = new InputStreamReader(request.getRequestBody(), "utf-8");
+            json = new BufferedReader(isr).readLine();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        return parseJson(json);
+    }
+
+    /**
+     * Parse a JSON and return a Map with keys equals to parameters name and values equals to the parameters values.
+     * @param json the String representing the stringified JSON.
+     * @return Map where both keys and values are strings containing the parameters.
+     */
+    public static Map<String, String> parseJson(String json) {
+        // parse the JSON body.
+        if (json == null || json.length() == 0) throw new IllegalArgumentException("Invalid query: null.");
+
+        // HashMap to be filled with all parameters in the query
+        Map<String, String> parameters = new HashMap<>();
+
+        // remove parenthesis and quotes
+        json = json.replace("{", "").replace("}", "").replaceAll("\"", "");
+
+        // Split the query in pairs key=value
+        String pairs[] = json.split("[,]");
+        // Split each pair in key and value and put them in the Map
+        for (String pair : pairs) {
+            String param[] = pair.split("[:]");
+            if (param.length > 0) {
+                String key = param[0];
+                String value = null;
+                if (param.length > 1) value = param[1];
+                parameters.put(key, value);
+            }
+        }
+        return parameters;
+    }
+
+    /**
+     * Send a response to an HttpExchange request.
+     * @param request the request.
+     * @param response a String containing the response.
+     * @param code the status code of the response.
+     */
     public static void sendResponse(HttpExchange request, String response, int code) {
         try {
             request.sendResponseHeaders(code, response.length());
@@ -82,29 +123,50 @@ public class HttpHelper {
         }
     }
 
+    /**
+     * Send a response to an HttpExchange request.
+     * @param request the request.
+     * @param response a String containing the response..
+     */
     public static void sendResponse(HttpExchange request, String response) {
         sendResponse(request, response, 200);
     }
 
+
+    /* CLIENT SIDE */
+
+    /**
+     * Make a GET request on the specified url.
+     * @param url the url to be called.
+     * @param parameters a map containing all the parameters that you want to be passed when the url is called.
+     * @return a {@link Response} object.
+     */
     public static Response makeGet(String url, Map<String, String> parameters) {
         return makeRequest(url + querifyParameters(parameters), "GET", "");
     }
 
+    /**
+     * Make a POST request on the specified url.
+     * @param url the url to be called.
+     * @param parameters a map containing all the parameters that you want to be passed in the body.
+     * @return a {@link Response} object.
+     */
     public static Response makePost(String url, Map<String, String> parameters) {
         return makeRequest(url, "POST", jsonifyParameters(parameters));
     }
 
+    // internal function
     private static Response makeRequest(String url, String method, String parameters) {
         HttpURLConnection connection = null;
-
+        int status = -1;
         try {
             //Create connection
             connection = (HttpURLConnection) new URL(url).openConnection();
+            connection.setDoOutput(true);
             connection.setRequestMethod(method);
             connection.setRequestProperty("Content-Type", "application/json");
             connection.setRequestProperty("Content-Length", Integer.toString(parameters.getBytes().length));
             connection.setRequestProperty("Content-Language", "en-US");
-            connection.setRequestProperty("Cookie", joinCookie(cookieManager.getCookieStore().getCookies()));
             connection.setConnectTimeout(5000);
             connection.setReadTimeout(5000);
 
@@ -115,19 +177,15 @@ public class HttpHelper {
                 outputStream.close();
             }
 
-            // Get cookies
-            String cookiesHeader = connection.getHeaderField("Set-Cookie");
-            List<HttpCookie> cookies = HttpCookie.parse(cookiesHeader);
-            cookies.forEach(cookie -> cookieManager.getCookieStore().add(null, cookie));
-
             //Get Response
-            int status = connection.getResponseCode();
+            status = connection.getResponseCode();
             BufferedReader bufferedReader = new BufferedReader(new InputStreamReader(connection.getInputStream()));
-            StringBuilder responseData = new StringBuilder(); // or StringBuffer if Java version 5+
+            StringBuilder responseData = new StringBuilder();
             String line;
+            String separator = "";
             while ((line = bufferedReader.readLine()) != null) {
-                responseData.append(line);
-                responseData.append('\r');
+                responseData.append(separator).append(line);
+                separator = "\n";
             }
             bufferedReader.close();
 
@@ -135,25 +193,19 @@ public class HttpHelper {
         }
         catch (IOException e) {
             e.printStackTrace();
-            return null;
+            return status < 0 ? null : new Response(status, "");
         }
         finally {
             if (connection != null) connection.disconnect();
         }
     }
 
-    private static String joinCookie(List<?> list) {
-        if (list == null || list.size() == 0) return null;
-        final StringBuilder stringBuilder = new StringBuilder(list.size() * 16);
-        for (int i = 0; i < list.size(); i++) {
-            if (i > 0) stringBuilder.append(";");
-            Object elem = list.get(i);
-            if (elem != null) stringBuilder.append(elem);
-        }
-        return stringBuilder.toString();
-    }
-
-    private static String jsonifyParameters(Map<String, String> parameters) {
+    /**
+     * Return a stringified JSON with the passed parameters.
+     * @param parameters a Map where both keys and values are strings containing the parameters.
+     * @return the stringified JSON.
+     */
+    public static String jsonifyParameters(Map<String, String> parameters) {
         if (parameters == null) return "";
         StringBuilder stringBuilder = new StringBuilder();
         stringBuilder.append("{");
@@ -161,13 +213,18 @@ public class HttpHelper {
         for (Map.Entry<String, String> entry : parameters.entrySet()) {
             stringBuilder.append(separator)
                     .append("\"").append(entry.getKey()).append("\":\"").append(entry.getValue()).append("\"");
-            separator = ";";
+            separator = ",";
         }
         stringBuilder.append("}");
         return stringBuilder.toString();
     }
 
-    private static String querifyParameters(Map<String, String> parameters) {
+    /**
+     * Return a string containing the parameters in the query format, ready to be appended to an url for a GET request.
+     * @param parameters a Map where both keys and values are strings containing the parameters.
+     * @return the String in the url format.
+     */
+    public static String querifyParameters(Map<String, String> parameters) {
         if (parameters == null || parameters.size() == 0) return "";
         StringBuilder stringBuilder = new StringBuilder();
         stringBuilder.append("?");
@@ -180,12 +237,27 @@ public class HttpHelper {
         return stringBuilder.toString();
     }
 
+    /**
+     * Response class returned by the makeGet and makePost method.
+     * Contains two field: the response code and the data String of the response.
+     * @author Aldo D'Aquino.
+     * @version 1.0.
+     */
     public static class Response {
-        public int code;
-        public String data;
+        public final int code;
+        public final String data;
         private Response (int code, String data) {
             this.code = code;
             this.data = data;
+        }
+
+        /**
+         * Returns this object as a stringified JSON.
+         * @return a String representing the stringified JSON.
+         */
+        @Override
+        public String toString() {
+            return "{\"code\":\"" + code + "\",\"data\":\"" + data + "\"}";
         }
     }
 
