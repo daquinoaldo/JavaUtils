@@ -1,13 +1,18 @@
-package com.daquinoaldo.javautils;
+package com.aldodaquino.javautils;
 
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.stream.Stream;
 
+/**
+ * Help parsing the args[]. You can add the option you want retrieve and this class will parse it automatically.
+ * @author Aldo D'Aquino.
+ * @version 1.0.
+ */
 public class CliHelper {
 
-    private ArrayList<CliOption> cliOptions = new ArrayList<>();
-    private ArrayList<CliFlag> cliFlags = new ArrayList<>();
+    private final ArrayList<CliOption> cliOptions = new ArrayList<>();
+    private final ArrayList<CliFlag> cliFlags = new ArrayList<>();
     private int maxLongOptLength = 0;
 
     /**
@@ -16,8 +21,8 @@ public class CliHelper {
      * @param longOpt like "--verbose".
      * @param hasValue true if the option must have a value (i.e. -o value),
      *                 false if is an option without value (i.e. --help).
-     * @throws IllegalArgumentException if the {@param shortOpt} or the {@param longOpt} already exists in another
-     * option.
+     * @param description the description of the option to be shown in the help message.
+     * @throws IllegalArgumentException if the shortOpt or the longOpt already exists in another option.
      */
     public void addOption(String shortOpt, String longOpt, boolean hasValue, String description) {
         if (!hasValue) addFlag(shortOpt, longOpt, description);
@@ -79,12 +84,8 @@ public class CliHelper {
      * @return the first value, empty string if the option has no value or null if this option doesn't exist.
      */
     public String getValue(String opt) {
-        for (CliOption cliOption : cliOptions)
-            if (cliOption.isEqual(opt)) {
-                String[] values = cliOption.getValues();
-                return values.length == 0 ? "" : values[0];
-            }
-        return null;
+        String[] values = getValues(opt);
+        return values == null ? null : values.length == 0 ? "" : values[0];
     }
 
     /**
@@ -152,8 +153,8 @@ public class CliHelper {
     /* Auxiliary classes */
 
     private class CliObject {
-        String shortOpt;
-        String longOpt;
+        final String shortOpt;
+        final String longOpt;
         String description;
 
         CliObject(String shortOpt, String longOpt, String description) {
@@ -176,7 +177,7 @@ public class CliHelper {
 
     private class CliOption extends CliObject {
 
-        ArrayList<String> values = new ArrayList<>();
+        final ArrayList<String> values = new ArrayList<>();
 
         CliOption(String shortOpt, String longOpt, String description) {
             super(shortOpt, longOpt, description);
